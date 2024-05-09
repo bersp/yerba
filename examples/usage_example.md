@@ -10,17 +10,17 @@ This is a title
 And this is a subtitle
 -------------------
 
-Yo can write text, **in-line math** $f(x) = e^{x}$ and
+Yo can write _text_, _in-line math_ $f(x) = e^{x}$ and math
 
 $$
-  \text{math} \quad [\int](var="v")_0^{x} f(x')~ [dx](var="v") = f(x)
+  [\int](id=1)_0^{x} f'(x)~ [dx](id=1) = f(x) - f(0)
 $$
 
 out of line.
 
 >! vspace - 1
 >! pause
->! mod - "v", color=RED
+>! mod - 1, color=RED
 
 Additionally, you can write [colorful things](color=BLUE)
 
@@ -30,8 +30,8 @@ Additionally, you can write [colorful things](color=BLUE)
 a1 = Arrow(start=LEFT+DOWN/3, end=2.5*LEFT+DOWN/3, color=GRAY)
 t1 = (p.add_text(r"Also, this space here was added using a `vspace`")
        .next_to(a1, RIGHT))
-
 p.add([a1, t1], box="floating")
+
 p.pause()
 
 a2 = Arrow(start=ORIGIN, end=1.2*UP, color=GRAY).next_to(t1, DOWN)
@@ -42,22 +42,19 @@ p.pause()
 p.remove([a1, a2, t1, t2])
 ```
 
-
 # notitle
-
->! set box - 'full'
 
 You can even do [other things](fill_color=[WHITE,GREEN,WHITE]) with the text and math
 
 $$
-  [2](color=RED,var="v1") + [3](color=BLUE,var="v2")
-  = [5](var="v3")
+  [2](color=RED,id=1) + [3](color=BLUE,id=2)
+  = [5](id=3)
 $$
 
 >! pause
->! mod - "v1", rotate=-90
->! mod - "v2", font_size=60
->! bec - "v3", p.text("$\pi$")
+>! mod - 1, rotate=-90
+>! mod - 2, font_size=60
+>! bec - 3, p.text("$\pi$")
 
 Grids
 ======================================================================
@@ -68,7 +65,7 @@ A bit about grids and subgrids
 
 >! set box - 'A', arrange='center'
 
-This is one _box_.
+This is a **box**.
 $$
     \int 2 ~d x = 2t
 $$
@@ -87,3 +84,50 @@ Boxes can have different shapes
 >! add - p.named_boxes.content.get_bbox_grid(), box="floating"
 
 These are the defined boxes
+
+Codeblocks
+======================================================================
+Fragment and Overwrite Codeblocks
+---------------------------------
+>! set box - 'content', arrange='center'
+
+```markdown fragment - id=1
+This text is writen in a `fragment` codeblock.
+```
+You can change the properties of the fragments on the fly.
+>! pause
+
+```markdown fragment - id=2
+**You can change their [color](color=RED)**
+```
+>! mod - 1, color=RED
+>! pause
+
+```markdown overwrite - 2
+**You can change their _rotation_**
+```
+>! mod - 1, rotate=180*DEGREES
+>! pause
+
+```markdown overwrite - 2
+**Or even change the whole text**
+```
+```markdown overwrite - 1, color=PURPLE
+This text was change using an `overwrite` codeblock.
+```
+
+Codeblocks
+======================================================================
+Alternate Codeblocks
+---------------------------------
+If you are only interested in alternating between different options you can use an `alternate` codeblock:
+
+```markdown alternate - arrange='relative center'
+>! add image - 'example.png', height='80%'
+---
+>! add image - 'example.png', height='80%', draft_mode=True
+---
+$$
+\vec{F} = m\vec{a} [-](font_size=100)
+$$
+```
