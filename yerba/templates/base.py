@@ -317,6 +317,8 @@ class PresentationTemplateBase(PresentationTemplateAbstract):
                 t = self.render_md(node)
                 mo = self.add_latex_math(t[2:-3], box=box, **text_props)
                 mo_vg.add(mo)
+            elif node.type == "softbreak":
+                pass
             else:
                 acc_text += self.render_md(node)
         if acc_text:
