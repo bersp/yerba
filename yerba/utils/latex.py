@@ -115,7 +115,7 @@ class YerbaRenderers:
 
     def code_inline(self, node, context) -> str:
         code = node.content
-        return fr"\texttt{{{code}}}"
+        return fr"\verb|{code}|"
 
 # ---
 
