@@ -77,8 +77,8 @@ jobs:
         inputs: |
           ./dist/*.tar.gz
           ./dist/*.whl
-      upload-signing-artifacts: true
-      release-signing-artifacts: false
+        upload-signing-artifacts: true
+        release-signing-artifacts: false
     - name: Create GitHub Release
       env:
         GITHUB_TOKEN: ${{ github.token }}
