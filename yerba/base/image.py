@@ -2,13 +2,14 @@ import os
 import re
 import subprocess
 import shutil
+import uuid
 from manim import VGroup, Rectangle
 from xml.etree import ElementTree
 from PIL import Image
 
-from ..utils.constants import SLIDE_X_RAD, SLIDE_Y_RAD, TO_PX, UL
-from ..defaults import colors
-from ..base.ptext import Ptex
+from ..managers.color_manager import ColorManager
+from ..base.ytext import Ytex
+from ..utils.constants import UL, PX, SLIDE_X_RAD, SLIDE_Y_RAD
 
 
 class ImageSvgBase(VGroup):
@@ -19,27 +20,29 @@ class ImageSvgBase(VGroup):
         self.basename = os.path.basename(filename)
         self.draft_mode = draft_mode
 
+        colors = ColorManager()
+
         rec = (Rectangle(width=width, height=height)
                .set_stroke(opacity=0)
-               .set_fill(color=colors["BLACK"], opacity=0.8))
+               .set_fill(color=colors.get_color("BLACK"), opacity=0.8))
 
         if draft_mode:
             tex_filename = filename.replace("_", r"\\_")
             tex_filename = fr"\\texttt{{{tex_filename}}}"
             super().__init__(
                 rec,
-                Ptex(tex_filename, color=colors["BLACK"]).move_to(
-                    rec).set(width=width*0.9)
+                Ytex(tex_filename, color=colors.get_color("BLACK")).move_to(
+                     rec).set(width=width*0.9)
             )
         else:
             super().__init__(rec)
 
     def _manim_to_svg_coords(self):
         x0, y0 = self.get_corner(UL)[:2]
-        x0 = (SLIDE_X_RAD+x0)*TO_PX
-        y0 = (SLIDE_Y_RAD-y0)*TO_PX
-        w = self.width*TO_PX
-        h = self.height*TO_PX
+        x0 = (SLIDE_X_RAD+x0)*PX
+        y0 = (SLIDE_Y_RAD-y0)*PX
+        w = self.width*PX
+        h = self.height*PX
 
         return x0, y0, w, h
 
@@ -78,7 +81,7 @@ class ImageSvgBase(VGroup):
             width = file_width/file_height*height
         else:
             raise ValueError(
-                "You have to specify either 'width' or 'height', not both")
+                "You have to specify either 'width' or 'height', and not both")
 
         return width, height
 
@@ -114,8 +117,17 @@ class ImagePDFSvg(ImageSvgBase):
         svg_str_raw = self._get_svg_str_raw(filename, backend)
         self.xml_tree = ElementTree.fromstring(svg_str_raw)
 
-        fw = float(self.xml_tree.get('width').replace("pt", ""))
-        fh = float(self.xml_tree.get('height').replace("pt", ""))
+        unique_prefix = f"{uuid.uuid4().hex[:8]}_"
+        self._rename_ids(self.xml_tree, unique_prefix)
+
+        fw, fh = self.xml_tree.get('width'), self.xml_tree.get('height')
+        if fw is not None and fh is not None:
+            fw = float(fw.replace("pt", ""))
+            fh = float(fh.replace("pt", ""))
+        else:
+            raise ValueError("An error occurred while parsing the PDF "
+                             f"file {filename!r} to SVG.")
+
         width, height = self._get_width_and_height(width, height, fw, fh)
 
         super().__init__(filename, width, height, draft_mode)
@@ -145,3 +157,30 @@ class ImagePDFSvg(ImageSvgBase):
                            ).stdout.decode("utf-8")
 
         return s
+
+    def _rename_ids(self, root, prefix):
+        ids_map = {}
+        for elem in root.iter():
+            if 'id' in elem.attrib:
+                old_id = elem.get('id')
+                new_id = prefix + old_id
+                elem.set('id', new_id)
+                ids_map[old_id] = new_id
+
+        if not ids_map:
+            return
+
+        escaped_ids: list[str] = list(map(re.escape, ids_map.keys()))
+
+        pattern = re.compile(r"#(" + "|".join(escaped_ids) + r")\b")
+
+        def replace_id(m):
+            old = m.group(1)
+            return "#" + ids_map[old]
+
+        for elem in root.iter():
+            for attr_name in list(elem.attrib.keys()):
+                attr_value = elem.attrib[attr_name]
+                if "#" in attr_value:  # Quick verification to not apply re if not necessary
+                    new_attr_value = pattern.sub(replace_id, attr_value)
+                    elem.set(attr_name, new_attr_value)

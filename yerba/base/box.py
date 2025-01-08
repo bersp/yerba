@@ -2,13 +2,16 @@ from __future__ import annotations
 import numpy as np
 from manim import VMobject, VGroup, Rectangle
 
-from ..defaults import box_params, colors
+from ..defaults import box_params
+from ..managers.color_manager import ColorManager
 from ..utils.constants import (
-    UP, DOWN, LEFT, RIGHT, ORIGIN, SLIDE_HEIGHT, SLIDE_WIDTH,
-    LEFT_EDGE, RIGHT_EDGE, SLIDE_X_RAD, SLIDE_Y_RAD, TOP_EDGE, BOTTOM_EDGE, UL, DR
+    UP, DOWN, LEFT, RIGHT, ORIGIN, SLIDE_HEIGHT, SLIDE_WIDTH, LEFT_EDGE,
+    RIGHT_EDGE, SLIDE_X_RAD, SLIDE_Y_RAD, TOP_EDGE, BOTTOM_EDGE, UL, DR
 )
-from ..utils.others import (restructure_list_to_exclude_certain_family_members,
-                            replace_in_list)
+from ..utils.aux_functions import (
+    restructure_list_to_exclude_certain_family_members,
+    replace_in_list
+)
 
 
 class Box():
@@ -135,14 +138,17 @@ class Box():
         if self.arrange is None or len(self.mobjects) == 0 or self.is_null:
             return
 
-        centers = [mo.get_center() for mo in self.mobjects]
+        centers = []
+        for mo in self.mobjects:
+            centers.append(mo.get_center())
+            mo.move_to(ORIGIN)
 
         if self.arrange == "center":
             (VGroup(*self.mobjects)
-             .arrange(direction=DOWN, buff=self.arrange_buff)
              .move_to(self.center))
-        elif self.arrange == "relative center":
+        elif self.arrange == "hcenter":
             (VGroup(*self.mobjects)
+             .arrange(direction=DOWN, buff=self.arrange_buff)
              .move_to(self.center))
         elif self.arrange == "top center":
             (VGroup(*self.mobjects)
@@ -165,12 +171,14 @@ class Box():
              .arrange(DOWN, buff=self.arrange_buff, aligned_edge=RIGHT)
              .next_to(self.get_right(), LEFT, buff=0))
         else:
-            ValueError(f"'arrange' {self.arrange!r} is not defined")
+            raise ValueError(f"Arrange {self.arrange!r} is not defined")
 
         for cent, mo in zip(centers, self.mobjects):
 
             if hasattr(mo, 'box_arrange'):
-                if mo.box_arrange == "center":
+                if mo.box_arrange == "none":
+                    pass
+                elif mo.box_arrange == "center":
                     mo.move_to(self.center)
                 elif mo.box_arrange == "hcenter":
                     mo.set_x(self.center[0])
@@ -239,7 +247,8 @@ class Box():
 
         return self.grid
 
-    def get_bbox_mo(self, color=colors["BLACK"]) -> VMobject:
+    def get_bbox_mo(self, color="BLACK") -> VMobject:
+        color = ColorManager().get_color(color)
         r = (
             Rectangle(height=self.height, width=self.width,
                       fill_color=color, fill_opacity=0.2)
@@ -250,7 +259,9 @@ class Box():
 
         return r
 
-    def get_bbox_grid(self, color=colors["RED"]) -> VMobject:
+    def get_bbox_grid(self, color="RED") -> VMobject:
+        color = ColorManager().get_color(color)
+
         if self.grid is None:
             raise ValueError(f"{self!r} has no defined grid")
 
@@ -283,7 +294,7 @@ class Box():
         self.height = value
         return self
 
-    def set_arrange(self, value):
+    def set_arrange(self, value: str | None):
         self.arrange = None if value == "none" else value
         return self
 

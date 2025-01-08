@@ -1,22 +1,19 @@
 import os
 import re
 import pkg_resources
+
 from markdown_it import MarkdownIt
 from markdown_it.tree import SyntaxTreeNode
-import mdformat
-from mdformat.renderer._context import (
-    DEFAULT_RENDERERS, make_render_children, longest_consecutive_sequence
-)
+from mdformat.renderer._context import make_render_children
 
-from .constants import *
-from ..defaults import colors
-
-# make colors global variables
-for k, v in colors.items():
-    globals()[k] = v
+from ..utils.constants import SLIDE_WIDTH
+from ..managers.color_manager import ColorManager
 
 
 def parse_props(props: str):
+    from ..utils import constants
+    locals().update(vars(constants))
+    locals().update(ColorManager().colors)
     props = (props.replace(r"%20", r" ")
                   .replace(r"%22", r'"')
                   .replace(r"%5B", r"[")
@@ -41,32 +38,34 @@ def markdown_to_manim_text_and_props(md_nodes):
     idx_submo = []
     out_text = ""
 
-    soft_brake_happend = False
+    soft_brake_state = 0
 
     ii = 0
     for node in md_nodes:
         if node.type == "text":
             out_text += node.content
-            ii += 1
 
-            if soft_brake_happend:
-                soft_brake_happend = False
+            # increment ii only if the last node was a 'softbreak'
+            # and the previous one a modified text ('link')
+            if soft_brake_state <= 0:
+                ii += 1
+            soft_brake_state = 0
 
         # handle substrings with props
         elif node.type == "link":
             pl = node.attrs['href']
             props.append(parse_props(pl))
-            out_text += "{{" + node.children[0].content + "}}"
 
             idx_submo.append(ii)
             ii += 1
 
-            if soft_brake_happend:
-                soft_brake_happend = False
+            out_text += "{{" + node.children[0].content + "}}"
+
+            soft_brake_state = -1
 
         elif node.type == "softbreak":
             out_text += " "
-            soft_brake_happend = True
+            soft_brake_state += 1
 
         else:
             raise ValueError(
@@ -93,9 +92,8 @@ def process_enhanced_text(text):
 
 
 class YerbaRenderers:
-    """This a clase to parse markdown_it nodes with mdformat"""
+    """This a class to parse markdown_it nodes with mdformat"""
     def __init__(self):
-        t = DEFAULT_RENDERERS["text"]
         self.RENDERERS = {
             "em": self.em,
             "strong": self.strong,
@@ -113,7 +111,7 @@ class YerbaRenderers:
         text = make_render_children(separator="")(node, context)
         return fr"\textbf{{{text}}}"
 
-    def code_inline(self, node, context) -> str:
+    def code_inline(self, node, _) -> str:
         code = node.content
         return fr"\verb|{code}|"
 

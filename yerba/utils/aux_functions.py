@@ -1,47 +1,68 @@
 from __future__ import annotations
 import os
 import shutil
-from typing import NamedTuple
 from manim.utils.family import extract_mobject_family_members
-from manim import Mobject, VGroup
-from manim import logger, console
+from manim import VMobject
+
+from ..logger_setup import logger, console
 from ..defaults import parser_params
 
 
-class LinkedPositions(NamedTuple):
-    source: Mobject | list[Mobject]
-    destination: Mobject | VGroup
-    arrange: str | "Box" = None
-
-
-def exec_and_handle_exeption(func, msg, error_type="inline",
-                             f_args=None, f_kwargs=None, verbose=None):
-    f_args = f_args or tuple()
-    f_kwargs = f_kwargs or dict()
+def better_error_messages(custom_msg=None, verbose=None):
+    """
+    IMPORTANT: If custom_msg=None, the first argument, after self,
+    of the decorated function must be "text". TODO: Explain this.
+    """
 
     if verbose is None:
         verbose = parser_params["errors.verbose"]
-    try:
-        return func(*f_args, **f_kwargs)
-    except BaseException as e:
-        if verbose:
-            console.print_exception(suppress=(__file__, ))
 
-        elif error_type == "inline":
-            t = (msg.replace(r"%20", r" ")
-                 .replace(r"%22", r'"')
-                 .replace(r"%5B", r"[")
-                 .replace(r"%5D", r"]"))
-            logger.error(
-                f"There seems to be an error with the following line:\n{t}"
-                f"\nPython error: {e}"
-            )
-        elif error_type == "custom":
-            logger.error(msg+f"\nPython error: {e}")
-        else:
-            raise ValueError("'error_type' must be 'inline' or 'custom'")
+    def inner_decorator(func):
+        def wrapped(*f_args, **f_kwargs):
+            try:
+                return func(*f_args, **f_kwargs)
+            except BaseException as e:
+                if verbose:
+                    console.print_exception(suppress=(__file__,))
 
-        quit()
+                elif custom_msg is None:
+                    msg = f_kwargs.pop("text", None)
+                    if msg is None:
+                        msg = f_args[1]
+                        if not isinstance(msg, str):
+                            logger.error(
+                                f"[red]Better error messages ERROR ??[/red]"
+                                f"\n{func.__name__} did not receive a string as the first argument",
+                                extra={"markup": True, "highlighter": None},
+                            )
+                            quit()
+
+                    t = (
+                        msg.replace(r"%20", r" ")
+                        .replace(r"%22", r'"')
+                        .replace(r"%5B", r"[")
+                        .replace(r"%5D", r"]")
+                    )
+                    logger.error(
+                        f"There seems to be an error with the following line:\n[blue]{t}[/blue]"
+                        f"\n[red]Python error[/red]: {e}",
+                        extra={"markup": True, "highlighter": None},
+                    )
+
+                elif isinstance(custom_msg, str):
+                    logger.error(
+                        custom_msg + f"\n[red]Python error[/red]: {e}",
+                        extra={"markup": True, "highlighter": None},
+                    )
+
+                else:
+                    raise ValueError("'custom_msg' must be None or an str")
+
+                quit()
+
+        return wrapped
+
+    return inner_decorator
 
 
 def define_default_kwargs(new, **defaults):
@@ -87,7 +108,7 @@ def restructure_list_to_exclude_certain_family_members(mobject_list, to_remove):
             else:
                 new_list.append(mob)
         if not removed:
-            raise ValueError(f"Couldn't find the mobject in the list")
+            raise ValueError("Couldn't find the mobject in the list")
 
     add_safe_mobjects_from_list(mobject_list, set(to_remove))
 
@@ -95,7 +116,7 @@ def restructure_list_to_exclude_certain_family_members(mobject_list, to_remove):
 
 
 def replace_in_list(
-    mobj_list: list[Mobject], old_m: Mobject, new_m: Mobject
+    mobj_list: list[VMobject], old_m: VMobject, new_m: VMobject
 ) -> None:
     """
     Modified version of the function `manim.Scene.replace`
@@ -115,7 +136,7 @@ def replace_in_list(
             return
     # If we did not find the mobject in the mobject list or any submobjects,
     # (or the list was empty), indicate we did not make the replacement.
-    raise ValueError(f"Couldn't find the mobject in the list")
+    raise ValueError("Couldn't find the mobject in the list")
 
 
 def create_folder_structure():
@@ -131,12 +152,8 @@ def create_folder_structure():
 
 def check_dependencies():
     if not shutil.which("rsvg-convert"):
-        logger.error(
-            "rsvg-convert is not installed or it is not in the system's PATH."
-        )
+        logger.error("rsvg-convert is not installed or it is not in the system's PATH.")
         quit()
     if not shutil.which("xetex"):
-        logger.error(
-            "xetex is not installed or it is not in the system's PATH."
-        )
+        logger.error("xetex is not installed or it is not in the system's PATH.")
         quit()

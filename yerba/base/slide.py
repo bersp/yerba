@@ -1,22 +1,24 @@
 from __future__ import annotations
-from manim import Mobject, VGroup, Rectangle
-from collections.abc import Iterable, Callable
 
-from ..defaults import colors
-from ..utils.constants import (
-    SLIDE_HEIGHT, SLIDE_WIDTH, UP, LEFT, RIGHT, ORIGIN
-)
-from ..utils.others import (
-    restructure_list_to_exclude_certain_family_members, LinkedPositions
-)
+from manim_mobject_svg import create_svg_from_vmobject
+
+from manim import VMobject, VGroup, Rectangle
+
+from ..utils.aux_functions import restructure_list_to_exclude_certain_family_members
 from .box import Box
 from .image import ImageSvg, ImagePDFSvg
-from manim_mobject_svg import *
+from ..utils.aux_classes import LinkedPositionsList
+from ..utils.constants import SLIDE_WIDTH, SLIDE_HEIGHT
+from ..managers.color_manager import ColorManager
 
 
 class SubSlide:
-    def __init__(self, slide_number: int, subslide_number: int,
-                 background: Mobject | VGroup | None = None) -> None:
+    def __init__(
+        self,
+        slide_number: int,
+        subslide_number: int,
+        background: VMobject | VGroup | None = None,
+    ) -> None:
         """
         Initialize a SubSlide object.
 
@@ -26,7 +28,7 @@ class SubSlide:
             The slide number.
         subslide_number : int
             The subslide number.
-        background : Mobject, optional
+        background : VMobject, optional
             Custom background (not implemented).
         """
 
@@ -35,10 +37,13 @@ class SubSlide:
         self.mobjects = VGroup()
 
         if background is None:
-            background = Rectangle(width=SLIDE_WIDTH, height=SLIDE_HEIGHT,
-                                   color=colors["WHITE"],
-                                   fill_opacity=1)
-        self.mobjects.add(background.set_z_index(-2))
+            background = Rectangle(
+                width=SLIDE_WIDTH,
+                height=SLIDE_HEIGHT,
+                color=ColorManager().get_color("WHITE"),
+            )
+        if self.subslide_number == 0:
+            self.mobjects.add(background.set_z_index(-2))
 
         self.title: str | None = None
         self.subtitle: str | None = None
@@ -50,13 +55,16 @@ class SubSlide:
     def remove(self, mobjects) -> None:
         """Remove specified mobjects from the subslide."""
         new_l = restructure_list_to_exclude_certain_family_members(
-            self.mobjects, mobjects)
+            self.mobjects, mobjects
+        )
         self.mobjects = VGroup(*new_l)
 
     def write(self) -> None:
         """Write the subslide to an SVG file."""
-        out_filename = (f"./media/slides/s{self.slide_number:04g}"
-                        f"_subs{self.subslide_number:04g}.svg")
+        out_filename = (
+            f"./media/slides/s{self.slide_number:04g}"
+            f"_subs{self.subslide_number:04g}.svg"
+        )
 
         vec_mobjects = VGroup()
         img_mobjects = []
@@ -70,35 +78,24 @@ class SubSlide:
             else:
                 vec_mobjects += mo
 
-        vec_mobjects.to_svg(out_filename, crop=False)
+        create_svg_from_vmobject(vec_mobjects, out_filename, crop=False)
 
         for img in img_mobjects:
-            # TODO(bersp): Figure out how to do this without coping the img
-            # shutil.copyfile(img.filename, f"./media/slides/{img.basename}")
             self._write_img(out_filename, img.get_svg_str())
 
         for pimg in pdf_img_mobjects:
             self._write_img(out_filename, pimg.get_svg_str())
 
     def _write_img(self, svg_file, svg_str):
-        with open(svg_file, 'r') as f:
-            t = f.read()
-        t = t.replace(r"</svg>", f"{svg_str}\n</svg>")
-        with open(svg_file, 'w') as f:
-            f.write(t)
+        with open(svg_file, "r") as f:
+            lines = f.readlines()
+        lines.insert(3, svg_str)
+        with open(svg_file, "w") as f:
+            f.writelines(lines)
 
 
 class Slide:
     def __init__(self, slide_number: int, background=None) -> None:
-        """
-        Initialize a Slide object.
-
-        Parameters
-        ----------
-        slide_number : int
-            The slide number.
-        """
-
         self.slide_number: int = slide_number
         self.subslide_number: int = 0
 
@@ -106,8 +103,12 @@ class Slide:
             SubSlide(slide_number, self.subslide_number, background=background)
         ]
 
-        self.linked_positions: list[LinkedPositions] = []
+        self.linked_positions = LinkedPositionsList()
         self.boxes: list[Box] = []
+
+    @property
+    def mobjects(self):
+        return self.subslides[-1].mobjects
 
     def add_new_subslide(self, n=1, background=None) -> None:
         """
@@ -116,8 +117,9 @@ class Slide:
         if isinstance(n, int):
             for _ in range(n):
                 self.subslide_number += 1
-                s = SubSlide(self.slide_number, self.subslide_number,
-                             background=background)
+                s = SubSlide(
+                    self.slide_number, self.subslide_number, background=background
+                )
                 s.add(self.subslides[-1].mobjects)
 
                 self.subslides.append(s)
@@ -140,8 +142,8 @@ class Slide:
         for mo in mobjects:
             box = self._get_box_if_already_exists(mo.box)
             if not box.is_null:
-                mo.origin_subslide_number = self.subslide_number
                 box.add(mo)
+                mo.origin_subslide_number = self.subslide_number
                 to_add.append(mo)
 
         self._add_to_subslide(to_add, idx)
@@ -153,7 +155,7 @@ class Slide:
         TODO(bersp): DOC
         """
 
-        return self._remove_from_subslide(mobjects, idx=-1)
+        return self._remove_from_subslide(mobjects, idx=idx)
 
     def write(self) -> None:
         """
@@ -163,42 +165,10 @@ class Slide:
         for box in self.boxes:
             box.auto_arrange()
 
-        self.arrange_linked_positions()
+        self.linked_positions.do_aligment()
 
         for ss in self.subslides:
             ss.write()
-
-    def arrange_linked_positions(self):
-        for lmp in self.linked_positions:
-            if isinstance(lmp.source, list):
-                src_list = lmp.source
-            else:
-                src_list = [lmp.source]
-            dst = lmp.destination
-
-            if lmp.arrange == "dest":
-                arrange = dst[0].box.arrange
-            elif isinstance(lmp.arrange, Box):
-                arrange = lmp.arrange.arrange
-            else:
-                arrange = lmp.arrange
-
-            assert isinstance(arrange, str)
-
-            if arrange == "center":
-                VGroup(*src_list).align_to(dst, UP)
-            elif arrange == "relative center":
-                VGroup(*src_list).move_to(dst)
-            else:
-                d1, d2 = arrange.split(" ")
-                alignment = ORIGIN.copy()
-                if d1 == "top":
-                    alignment += UP
-                if d2 == "left":
-                    alignment += LEFT
-                elif d2 == "right":
-                    alignment += RIGHT
-                VGroup(*src_list).align_to(dst, alignment)
 
     def _add_to_subslide(self, mobjects, idx=-1):
         self.subslides[idx].add(mobjects)

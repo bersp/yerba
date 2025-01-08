@@ -1,7 +1,12 @@
+import re
+import os
+import shutil
 from markdown_it import MarkdownIt
 from markdown_it.tree import SyntaxTreeNode
 from mdit_py_plugins.front_matter import front_matter_plugin
 from mdit_py_plugins.dollarmath import dollarmath_plugin
+
+from ..utils.aux_functions import better_error_messages
 
 
 def are_nodes_equal(node1, node2):
@@ -13,7 +18,7 @@ def are_nodes_equal(node1, node2):
 
 
 def is_h1(node):
-    return node.type == 'heading' and node.tag == 'h1'
+    return node.type == "heading" and node.tag == "h1"
 
 
 def get_markdownit_nodes(text):
@@ -23,25 +28,45 @@ def get_markdownit_nodes(text):
     return SyntaxTreeNode(md.parse(text))
 
 
-def get_slides_md_nodes(md_file, old_md_file) -> list[dict]:
-    if old_md_file is None:
+def handle_includes(text):
+    pattern = r"^(>!\s*include\s*\(\s*'([^']+)'\s*\)\s*)$"
+    return re.sub(pattern, _include_file_content, text, flags=re.MULTILINE)
+
+
+def _include_file_content(match):
+    filename_to_include = match.group(2)
+
+    _open = better_error_messages(
+        custom_msg=(f"An error occurred while including the file "
+                    + repr(filename_to_include))
+    )(open)
+    f = _open(filename_to_include, 'r')
+    o = f.read() + "\n"
+    f.close()
+    return o
+
+
+def get_slides_md_nodes(md_filename, old_md_filename) -> list[dict]:
+    if old_md_filename is None:
         old_text = '#'
     else:
-        with open(old_md_file, "r") as f:
+        with open(old_md_filename, "r") as f:
             old_text = f.read()
 
-    with open(md_file, "r") as f:
+    with open(md_filename, "r") as f:
         text = f.read()
+
+    text = handle_includes(text)
 
     nodes = get_markdownit_nodes(text)
 
     old_nodes = get_markdownit_nodes(old_text)
 
     old_idx = 0
-    old_idx_max = len(tuple(old_nodes))-1
+    old_idx_max = len(tuple(old_nodes))-1  # type: ignore
 
     idx = 0
-    idx_max = len(tuple(nodes))-1
+    idx_max = len(tuple(nodes))-1  # type: ignore
 
     slide_number = 0
 
@@ -128,4 +153,15 @@ def get_slides_md_nodes(md_file, old_md_file) -> list[dict]:
     d['is_new_slide'] = is_new_slide
     slides.append(d)
 
+    return slides
+
+
+def get_slides(filename):
+    old_filename = os.path.join("./media/", f".old.{filename}")
+    if os.path.exists(old_filename):
+        for f in os.listdir("./media/slides/"):
+            shutil.move(f"./media/slides/{f}", f"./media/old_slides/{f}")
+        slides = get_slides_md_nodes(filename, old_filename)
+    else:
+        slides = get_slides_md_nodes(filename, None)
     return slides

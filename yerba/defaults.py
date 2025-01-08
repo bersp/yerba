@@ -1,7 +1,8 @@
 from __future__ import annotations
 from manim.mobject.types.vectorized_mobject import VMobject
 
-colors: dict[str, str] = {
+
+DEFAULT_COLORS: dict[str, str] = {
     "BLACK": "#2b3339",
     "DARKEST_GRAY":  "#323b41",
     "DARKER_GRAY":  "#3a454a",
@@ -20,31 +21,31 @@ colors: dict[str, str] = {
     "PURPLE":  "#b891b0",
 }
 
-VMobject.set_default(color=colors["BLACK"])
+VMobject.set_default(color=DEFAULT_COLORS["BLACK"])
 
 parser_params: dict[str, bool] = {
     "errors.verbose": False,
     "only_calculate_new_slides": True,
 }
 
-template_params: dict[str, str | float | bool] = {
+template_params: dict[str, str | float | bool | dict[str, str]] = {
     "add_footer": True,
 
     "add_to_preamble": "",
 
     "title.font_size": 40,
-    "title.color": colors["BLACK"],
+    "title.color": "BLACK",
     "title.style": "bold",
 
     "subtitle.font_size": 30,
-    "subtitle.color": colors["BLACK"],
+    "subtitle.color": "BLACK",
     "subtitle.style": "regular",
 
     "text.font_size": 30,
-    "text.color": colors["BLACK"],
+    "text.color": "BLACK",
 
     "math.font_size": 30,
-    "math.color": colors["BLACK"],
+    "math.color": "BLACK",
 
     "box.new_slide_default": "content",
 
@@ -58,7 +59,7 @@ box_params: dict[str, float] = {
 }
 
 
-codeblocks_namedict = {
+yerba_blocks_namedict = {
     "python_yerba": ["python yerba", "yerba"],
     "md_alternate": ["md alt", "md alternate",
                      "markdown alt", "markdown alternate",

@@ -1,38 +1,98 @@
 from __future__ import annotations
-import yaml
-import shutil
+
+import importlib
 import os
+import shutil
+from typing import TYPE_CHECKING
 
-import manim
+import yaml
 
-from .base.presentation import make_presentation_from_template
-from .utils.parser import get_slides_md_nodes
-from .utils.others import (
-    check_dependencies, create_folder_structure, exec_and_handle_exeption
+from .base.parser import get_slides
+from .defaults import parser_params, template_params
+from .logger_setup import logger
+from .managers.color_manager import ColorManager
+from .managers.id_manager import IDManager
+from .utils.aux_functions import (
+    better_error_messages,
+    check_dependencies,
+    create_folder_structure,
 )
-from .defaults import parser_params, template_params, colors
 
-# make colors global variables
-for k, v in colors.items():
-    globals()[k] = v
+if TYPE_CHECKING:
+    from .base.template import PresentationTemplateBase
+
+
+better_error_messages(custom_msg="There seems to be an error loading the template.")
+
+
+def make_presentation_from_template(template_name, custom_template_name):
+    inh_bases = []
+
+    if custom_template_name is not None:
+        try:
+            ct = importlib.import_module(custom_template_name)
+        except ModuleNotFoundError:
+            raise Exception(f"No template named {repr(custom_template_name)}")
+
+        pct = getattr(ct, "PresentationTemplate", None)
+        if pct is None:
+            logger.error(
+                f"'PresentationTemplate' is not defined in {repr(custom_template_name)}"
+            )
+        else:
+            inh_bases.append(pct)
+
+    if os.path.exists(template_name + ".py"):
+        mod = (template_name,)
+    else:
+        mod = (f".templates.{template_name}", "yerba")
+    try:
+        t = importlib.import_module(*mod)
+    except ModuleNotFoundError:
+        raise Exception(f"No template named {template_name!r}")
+
+    pt = getattr(t, "PresentationTemplate", None)
+    if pt is None:
+        logger.error(f"'PresentationTemplate' is not defined in {template_name!r}")
+        quit()
+    else:
+        inh_bases.append(pt)
+
+    return type("Presentation", tuple(inh_bases), {})
+
+
+@better_error_messages(custom_msg="There seems to be an error in the medatada.")
+def process_metadata(metadata, parser_params, template_params):
+    if "parser_params" in metadata:
+        parser_params.update(metadata["parser_params"])
+
+    if "template_params" in metadata:
+        template_params.update(metadata["template_params"])
+
+    if "colors" in metadata:
+        ColorManager().add_multiple_colors(metadata.pop("colors"))
+
+def clean_old_slides_folder_and_generate_dot_old_file(filename):
+    for f in os.listdir("./media/old_slides/"):
+        os.remove(f"./media/old_slides/{f}")
+    shutil.copyfile(filename, f"./media/.old.{filename}")
 
 
 class MainRutine:
-    def __init__(self, filename) -> None:
+    def __init__(self, input_filename) -> None:
+        logger.info(
+            "Initializing [green]Yerba[/green] "
+            "—[i]Built on [green]Manim Community[/green][/i]—",
+            extra={"markup": True, "highlighter": None},
+        )
+
         check_dependencies()
         create_folder_structure()
 
-        self.filename: str = filename
+        self.input_filename: str = input_filename
         self.cover_metadata: dict | None = None
 
-        old_filename = f"./media/.old.{filename}"
-        if os.path.exists(old_filename):
-            for f in os.listdir("./media/slides/"):
-                shutil.move(f"./media/slides/{f}", f"./media/old_slides/{f}")
-            slides = get_slides_md_nodes(filename, old_filename)
-        else:
-            slides = get_slides_md_nodes(filename, None)
-        self.slides: list[dict] = slides
+        self.slides: list[dict] = get_slides(input_filename)
 
         self.template_name: str = "nice"
         self.custom_template_name: str | None = None
@@ -44,54 +104,10 @@ class MainRutine:
             " | xargs mv -t ./media/slides/"
         )
 
-    def initialize_presentation(self):
-        Presentation = exec_and_handle_exeption(
-            make_presentation_from_template, error_type="custom",
-            msg="There seems to be an error loading the template.",
-            f_kwargs=dict(
-                template_name=self.template_name,
-                custom_template_name=self.custom_template_name
-            )
-        )
-        output_filename = str(os.path.splitext(self.filename)[0])+".pdf"
-
-        p = exec_and_handle_exeption(
-            Presentation, error_type="custom",
-            msg="There seems to be an error initializing the presentation.",
-            f_kwargs=dict(
-                output_filename=output_filename,
-                template_params=template_params,
-                colors=colors
-            )
-        )
-        return p
-
-    def create_new_slide(self, slide_number):
-        exec_and_handle_exeption(
-            self.p.new_slide, error_type="custom",
-            msg="There seems to be an error creating a new slide.",
-            f_kwargs=dict(slide_number=slide_number)
-        )
-
     def compute_front_matter(self, node):
         metadata = yaml.safe_load(node.content)
 
-        def process_metadata(metadata):
-            if "parser_params" in metadata:
-                parser_params.update(metadata["parser_params"])
-
-            if "template_params" in metadata:
-                template_params.update(metadata["template_params"])
-
-            if "colors" in metadata:
-                colors.update(metadata["colors"])
-
-        exec_and_handle_exeption(
-            process_metadata,
-            msg="There seems to be an error in the medatada.",
-            error_type="custom",
-            f_kwargs=dict(metadata=metadata)
-        )
+        process_metadata(metadata, parser_params, template_params)
 
         if "cover" in metadata:
             self.cover_metadata = metadata.pop("cover")
@@ -102,15 +118,35 @@ class MainRutine:
         if "custom_template" in metadata:
             self.custom_template_name = metadata.pop("custom_template")
 
+    def initialize_presentation(self) -> PresentationTemplateBase:
+        Presentation = make_presentation_from_template(
+            template_name=self.template_name,
+            custom_template_name=self.custom_template_name,
+        )
+        self.output_filename = str(os.path.splitext(self.input_filename)[0]) + ".pdf"
+
+        p = Presentation(
+            id_manager=IDManager(),
+            color_manager=ColorManager(),
+            template_params=template_params,
+        )
+        return p
+
     def run(self):
         slide0 = self.slides[0]
 
         if slide0["is_new_slide"]:
             parser_params["only_calculate_new_slides"] = False
-            manim.logger.info("Loading configuration")
+            logger.info(
+                "[yellow b]Reading[/yellow b] configuration",
+                extra={"markup": True, "highlighter": None},
+            )
         else:
             slide0["is_new_slide"] = True
-            manim.logger.info("Loading configuration")
+            logger.info(
+                "[yellow]Loading[/yellow] configuration",
+                extra={"markup": True, "highlighter": None},
+            )
 
         if slide0["content"] and slide0["content"][0].type == "front_matter":
             node = self.slides[0]["content"].pop(0)
@@ -120,35 +156,41 @@ class MainRutine:
         self.p = self.initialize_presentation()
 
         if self.cover_metadata is not None:
-            exec_and_handle_exeption(
-                self.p.add_cover, error_type="custom",
-                msg="There seems to be an error creating the cover.",
-                f_kwargs=self.cover_metadata
-            )
+            self.p.add_cover(**self.cover_metadata)
 
         for n, slide in enumerate(self.slides):
             slide_number = slide["slide_number"]
             self.p.slide_number = slide_number
 
-            if (parser_params["only_calculate_new_slides"]
-                    and not slide["is_new_slide"] and n != 0):
+            if (
+                parser_params["only_calculate_new_slides"]
+                and not slide["is_new_slide"]
+                and n != 0
+            ):
                 self.use_backup_slide(slide_number)
                 title = slide["title"].children[0].content
-                manim.logger.info(f"Loading backup of slide '{title}'")
+                logger.info(
+                    rf"[yellow]Loading backup[/yellow] of Slide {slide_number} ([u]{title}[/u])",
+                    extra={"markup": True, "highlighter": None},
+                )
                 continue
 
             if n != 0:
                 title = slide["title"].children[0].content
-                manim.logger.info(f"Rendering slide '{title}'")
-                self.create_new_slide(slide_number)
+                logger.info(
+                    rf"[yellow b]Generating[/yellow b] Slide {slide_number} ([u]{title}[/u])",
+                    extra={"markup": True, "highlighter": None},
+                )
+                self.p.new_slide(slide_number)
                 self.p.compute_title(title)
 
             for node in slide["content"]:
                 self.p.compute_slide_content(node)
 
-        self.p.close()
-        for f in os.listdir("./media/old_slides/"):
-            os.remove(f"./media/old_slides/{f}")
-        shutil.copyfile(self.filename, f"./media/.old.{self.filename}")
+        self.p.write(self.output_filename)
 
-        manim.logger.info("Ready")
+        clean_old_slides_folder_and_generate_dot_old_file(self.input_filename)
+
+        logger.info(
+            "[green b]Ready[/green b]", extra={"markup": True, "highlighter": None}
+        )

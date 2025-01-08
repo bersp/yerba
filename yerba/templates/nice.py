@@ -1,32 +1,23 @@
 from __future__ import annotations
 
 import numpy as np
-import manim
+from manim import Circle, Difference, Rectangle, VGroup, VMobject
 
-from manim import (VMobject, VGroup, Circle, Rectangle, Difference)
-
-from yerba.templates.base import PresentationTemplateBase
-
-from yerba.utils.others import define_default_kwargs
-from yerba.base.ptext import Ptex
-
-from yerba.utils.constants import (
-    UP, DOWN, LEFT, RIGHT, ORIGIN, SLIDE_WIDTH, SLIDE_HEIGHT
-)
+from ..base.template import PresentationTemplateBase
+from ..utils.constants import RIGHT, SLIDE_HEIGHT, SLIDE_WIDTH, UP
 
 
 class PresentationTemplate(PresentationTemplateBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        manim.logger.info("Using template 'nice'")
-        self.colors["ACCENT"] = "#376A65"
+        self.colors.add_color("ACCENT", "#376A65")
 
         self.set_main_font(
             regular="Lato-Regular.ttf",
             bold="Lato-Bold.ttf",
             italic="Lato-Italic.ttf",
-            bold_italic="Lato-BoldItalic.ttf"
+            bold_italic="Lato-BoldItalic.ttf",
         )
 
     def background(self) -> VMobject | VGroup:
@@ -35,14 +26,18 @@ class PresentationTemplate(PresentationTemplateBase):
             inner_c = Circle(inner_r)
             d = (
                 Difference(outter_c, inner_c)
-                .set_fill(opacity=1, color=self.colors["ACCENT"])
+                .set_fill(opacity=1, color=self.colors.get_color("ACCENT"))
                 .set_stroke(width=0)
             )
             return d
 
         o = VGroup()
-        o += Rectangle(width=SLIDE_WIDTH, height=SLIDE_HEIGHT,
-                       color=self.colors["WHITE"], fill_opacity=1)
+        o += Rectangle(
+            width=SLIDE_WIDTH,
+            height=SLIDE_HEIGHT,
+            color=self.colors.get_color("WHITE"),
+            fill_opacity=1,
+        )
 
         for _ in range(20):
             x, y = np.random.uniform(2, 6), np.random.uniform(0, 3.5)
@@ -51,19 +46,19 @@ class PresentationTemplate(PresentationTemplateBase):
             else:
                 x, y = -x, y
             out_r = np.random.rand()
-            inn_r = np.random.uniform(out_r*.8, out_r)
-            alpha = (1-out_r)*np.random.uniform(0, 0.5)
-            o += ring(out_r, inn_r).move_to(x*RIGHT+y*UP).set_opacity(alpha)
+            inn_r = np.random.uniform(out_r * 0.8, out_r)
+            alpha = (1 - out_r) * np.random.uniform(0, 0.5)
+            o += ring(out_r, inn_r).move_to(x * RIGHT + y * UP).set_opacity(alpha)
 
         return o
 
     def add_title(self, text):
-
         box = self.get_box("title")
 
         title_mo = self.text(
-            text, font_size=self.template_params["title.font_size"],
-            color=self.colors["ACCENT"],
+            text,
+            font_size=self.template_params["title.font_size"],
+            color=self.colors.get_color("ACCENT"),
             style=self.template_params["title.style"],
         )
 
@@ -76,8 +71,9 @@ class PresentationTemplate(PresentationTemplateBase):
         box = self.get_box("title")
 
         subtitle_mo = self.text(
-            text, font_size=self.template_params["subtitle.font_size"],
-            color=self.colors["ACCENT"],
+            text,
+            font_size=self.template_params["subtitle.font_size"],
+            color=self.colors.get_color("ACCENT"),
             style=self.template_params["subtitle.style"],
         )
 

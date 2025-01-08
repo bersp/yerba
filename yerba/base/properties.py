@@ -1,33 +1,34 @@
 from functools import partial
 from collections.abc import Callable
 
-from manim.mobject.mobject import Mobject
-from .globals import g_ids
+from manim import VMobject
+from ..managers.id_manager import IDManager
 
-
-def hide_func(mo, val):
+def _hide_func(mo, val):
     if val is True:
         mo.set_opacity(0)
     else:
         mo.set_opacity(1)
 
 
-def id_func(mo, val):
-    return g_ids[val].append(mo)
+def _id_func(mo, val):
+    IDManager().add(val, mo) 
+    return None
 
 
-properties_set_dict: dict = {
-    'id': id_func,
+custom_props: dict = {
+    'id': _id_func,
     'opacity': lambda mo, val: mo.set_opacity(val),
-    'hide': hide_func
+    'hide': _hide_func
 }
 
 
 def funcs_from_props(props, only_custom_props=False):
+
     funcs = []
-    for custom_prop in properties_set_dict:
+    for custom_prop in custom_props:
         if custom_prop in props:
-            f = properties_set_dict[custom_prop]
+            f = custom_props[custom_prop]
             val = props.pop(custom_prop)
             funcs.append(partial(f, val=val))
 
@@ -35,7 +36,7 @@ def funcs_from_props(props, only_custom_props=False):
         return funcs, props
 
     for prop in list(props.keys()):
-        f = getattr(Mobject, prop, None)
+        f = getattr(VMobject, prop, None)
         if isinstance(f, Callable):
             val = props.pop(prop)
             funcs.append(
