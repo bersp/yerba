@@ -74,7 +74,7 @@ jobs:
     - name: Sign the dists with Sigstore
       uses: sigstore/gh-action-sigstore-python@v1.2.3
       with:
-        inputs: >-
+        files: |
           ./dist/*.tar.gz
           ./dist/*.whl
     - name: Create GitHub Release
