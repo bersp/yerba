@@ -3,11 +3,11 @@ from __future__ import annotations
 import numpy as np
 from manim import Circle, Difference, Rectangle, VGroup, VMobject
 
-from ..base.template import PresentationTemplateBase
+from ..base.template_protocol import PresentationTemplateProtocol
 from ..utils.constants import RIGHT, SLIDE_HEIGHT, SLIDE_WIDTH, UP
 
 
-class PresentationTemplate(PresentationTemplateBase):
+class PresentationTemplate(PresentationTemplateProtocol):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

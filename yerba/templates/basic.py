@@ -1,5 +1,5 @@
-from yerba.base.template import PresentationTemplateBase
+from ..base.template_protocol import PresentationTemplateProtocol
 
 
-class PresentationTemplate(PresentationTemplateBase):
+class PresentationTemplate(PresentationTemplateProtocol):
     pass

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import runpy
 import shutil
 from typing import TYPE_CHECKING
 
@@ -22,43 +23,57 @@ if TYPE_CHECKING:
     from .base.template import PresentationTemplateBase
 
 
-better_error_messages(custom_msg="There seems to be an error loading the template.")
-
-
-def make_presentation_from_template(template_name, custom_template_name):
-    inh_bases = []
-
-    if custom_template_name is not None:
-        try:
-            ct = importlib.import_module(custom_template_name)
-        except ModuleNotFoundError:
-            raise Exception(f"No template named {repr(custom_template_name)}")
-
-        pct = getattr(ct, "PresentationTemplate", None)
-        if pct is None:
-            logger.error(
-                f"'PresentationTemplate' is not defined in {repr(custom_template_name)}"
-            )
-        else:
-            inh_bases.append(pct)
-
-    if os.path.exists(template_name + ".py"):
-        mod = (template_name,)
-    else:
-        mod = (f".templates.{template_name}", "yerba")
+def get_template_from_file(template_name):
     try:
-        t = importlib.import_module(*mod)
-    except ModuleNotFoundError:
-        raise Exception(f"No template named {template_name!r}")
+        result_globals = runpy.run_path(template_name + ".py", run_name="__main__")
+    except FileNotFoundError:
+        logger.error(f"No template named {template_name!r}")
+        quit()
 
-    pt = getattr(t, "PresentationTemplate", None)
-    if pt is None:
+    tem = result_globals.get("PresentationTemplate", None)
+    if tem is None:
         logger.error(f"'PresentationTemplate' is not defined in {template_name!r}")
         quit()
-    else:
-        inh_bases.append(pt)
 
-    return type("Presentation", tuple(inh_bases), {})
+    return tem
+
+
+def get_template_from_yerba(template_name):
+    mod = (f".templates.{template_name}", "yerba")
+    try:
+        main_tem_mod = importlib.import_module(*mod)
+    except ModuleNotFoundError:
+        raise ValueError(f"No template named {template_name!r}")
+        quit()
+
+    tem = getattr(main_tem_mod, "PresentationTemplate", None)
+    if tem is None:
+        logger.error(f"'PresentationTemplate' is not defined in {template_name!r}")
+        quit()
+
+    return tem
+
+
+@better_error_messages(custom_msg="There seems to be an error loading the templates.")
+def make_presentation_from_template(templates):
+    templates_to_load = []  # inheritance bases for the Presentation
+
+    for template in templates[::-1]:
+        if os.path.exists(template + ".py"):
+            tem = get_template_from_file(template)
+        else:
+            tem = get_template_from_yerba(template)
+
+        templates_to_load.append(tem)
+
+    base_tem = getattr(
+        importlib.import_module(".base.template", "yerba"),
+        "PresentationTemplateBase",
+        None,
+    )
+    templates_to_load.append(base_tem)
+
+    return type("Presentation", tuple(templates_to_load), {})
 
 
 @better_error_messages(custom_msg="There seems to be an error in the medatada.")
@@ -71,6 +86,7 @@ def process_metadata(metadata, parser_params, template_params):
 
     if "colors" in metadata:
         ColorManager().add_multiple_colors(metadata.pop("colors"))
+
 
 def clean_old_slides_folder_and_generate_dot_old_file(filename):
     for f in os.listdir("./media/old_slides/"):
@@ -94,8 +110,7 @@ class MainRutine:
 
         self.slides: list[dict] = get_slides(input_filename)
 
-        self.template_name: str = "nice"
-        self.custom_template_name: str | None = None
+        self.templates: list[str] = []
 
     @staticmethod
     def use_backup_slide(slide_number):
@@ -112,17 +127,11 @@ class MainRutine:
         if "cover" in metadata:
             self.cover_metadata = metadata.pop("cover")
 
-        if "template" in metadata:
-            self.template_name = metadata.pop("template")
-
-        if "custom_template" in metadata:
-            self.custom_template_name = metadata.pop("custom_template")
+        if "templates" in metadata:
+            self.templates = metadata.pop("templates")
 
     def initialize_presentation(self) -> PresentationTemplateBase:
-        Presentation = make_presentation_from_template(
-            template_name=self.template_name,
-            custom_template_name=self.custom_template_name,
-        )
+        Presentation = make_presentation_from_template(templates=self.templates)
         self.output_filename = str(os.path.splitext(self.input_filename)[0]) + ".pdf"
 
         p = Presentation(
