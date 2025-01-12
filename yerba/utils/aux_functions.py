@@ -45,13 +45,13 @@ def better_error_messages(custom_msg=None, verbose=None):
                     )
                     logger.error(
                         f"There seems to be an error with the following line:\n[blue]{t}[/blue]"
-                        f"\n[red]Python error[/red]: {e}",
+                        f"\n[red]Error message[/red]: {e}",
                         extra={"markup": True, "highlighter": None},
                     )
 
                 elif isinstance(custom_msg, str):
                     logger.error(
-                        custom_msg + f"\n[red]Python error[/red]: {e}",
+                        custom_msg + f"\n[red]Error message[/red]: {e}",
                         extra={"markup": True, "highlighter": None},
                     )
 
