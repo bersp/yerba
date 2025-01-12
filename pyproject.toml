@@ -1,20 +1,21 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "yerba"
 version = "0.0.3-alpha-dev1"
-dependencies = [
-	"manim",
-	"manim-mobject-svg",
-	"markdown-it-py",
-	"mdformat",
-	"mdit-py-plugins",
-	"numpy",
-	"pillow",
-	"pyyaml"
-]
 requires-python = ">=3.8"
+dependencies = [
+  "manim",
+  "manim-mobject-svg",
+  "markdown-it-py",
+  "mdformat",
+  "mdit-py-plugins",
+  "numpy",
+  "pillow",
+  "pyyaml"
+]
 authors = [
   {name = "Bernardo L. Español", email = "esp.bernardo@gmail.com"},
 ]
@@ -24,5 +25,8 @@ license = {file = "LICENSE.txt"}
 [project.scripts]
 yerba = "yerba.__main__:cli_entry"
 
-[tool.setuptools]
-py-modules = []
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["yerba*"]
+exclude = []
+namespaces = false
