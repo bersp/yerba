@@ -226,9 +226,9 @@ class Box():
             cx += gw/2
 
         centers_y = []
-        cy = self.height/2 + hspace
+        cy = self.height/2 + vspace
         for gh in grid_heights:
-            cy -= gh/2 + hspace
+            cy -= gh/2 + vspace
             centers_y.append(cy)
             cy -= gh/2
 
