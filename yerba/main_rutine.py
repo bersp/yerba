@@ -97,11 +97,9 @@ def clean_old_slides_folder_and_generate_dot_old_file(filename):
 class MainRutine:
     def __init__(self, input_filename) -> None:
         logger.info(
-            "Initializing [green]Yerba[/green] "
-            "—[i]Built on [green]Manim Community[/green][/i]—",
+            f"Compiling [magenta]{input_filename}[/magenta]",
             extra={"markup": True, "highlighter": None},
         )
-
         check_dependencies()
         create_folder_structure()
 
