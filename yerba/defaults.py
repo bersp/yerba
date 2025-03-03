@@ -47,6 +47,10 @@ template_params: dict[str, str | float | bool | dict[str, str]] = {
     "math.font_size": 30,
     "math.color": "BLACK",
 
+    "list.item_label_0": r"[$\blacksquare$](scale=0.8)",
+    "list.item_label_1": r"\textbullet",
+    "list.item_label_2": r"---",
+
     "box.new_slide_default": "content",
 
     "box.full_with_margins.margins": 0.7,

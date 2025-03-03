@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from typing import Union as TypeUnion
 
 import manim
-from manim import Rectangle, TexTemplate, VGroup, VMobject
+from manim import Rectangle, TexTemplate, VGroup, VMobject, RIGHT
 from markdown_it import MarkdownIt
 from markdown_it.tree import SyntaxTreeNode
 from mdformat.renderer import MDRenderer
@@ -252,6 +252,47 @@ class PresentationTemplateBase(PresentationTemplateProtocol):
 
         return footer_mo
 
+    def add_list(self, node, box="active", **item_props):
+        funcs, item_props = funcs_from_props(item_props, only_custom_props=True)
+
+        box = self.get_box(box)
+
+        def process_list_recursively(self, nodes, box, funcs, item_props, depth=0):
+            item_mo_l = []
+            for node in nodes:
+                content = self.render_md(node.children.pop(0))
+                item_mo = self.list_item(content, depth=depth, **item_props)
+                item_mo.shift(depth * 0.5 * RIGHT)
+
+                for f in funcs:
+                    f(item_mo)
+
+                item_mo.set(box=box)
+                self.add(item_mo)
+                item_mo_l.append(item_mo)
+
+                if node.children:
+                    item_mo_l.extend(
+                        process_list_recursively(
+                            self, node.children[0], box, funcs, item_props, depth + 1
+                        )
+                    )
+
+            return item_mo_l
+
+        item_mo_l = process_list_recursively(self, node, box, funcs, item_props)
+
+        return item_mo_l
+
+    def list_item(
+        self, text, item_label=None, depth=0, **text_props
+    ):
+        depth = depth if depth <= 2 else 2
+
+        item_label = item_label or self.template_params[f"list.item_label_{depth}"]
+        text = f"{item_label}~{text}"
+        return self.text(text, **text_props)
+
     # -- specialized functions (you probably don't want to modify these)
 
     def add_latex_text(self, text, box="null", **text_props):
@@ -326,7 +367,7 @@ class PresentationTemplateBase(PresentationTemplateProtocol):
         else:
             img_mo = ImageSvg(filename, **img_args)
 
-        img_mo = img_mo.set(box=box, box_arrange=arrange)
+        img_mo.set(box=box, box_arrange=arrange)
         self.add(img_mo)
 
         for f in funcs:
@@ -405,6 +446,7 @@ class PresentationTemplateBase(PresentationTemplateProtocol):
         purple = self.get_color("PURPLE").replace("#", "")
         tt.add_to_preamble(
             r"""
+            \usepackage{graphicx}
             \usepackage{listings}
             \usepackage{xcolor}
             """
@@ -560,7 +602,7 @@ class PresentationTemplateBase(PresentationTemplateProtocol):
     def set_box(self, box, arrange=None):
         box = self.get_box(box)
         if arrange is not None:
-            box.arrange = arrange
+            box.set_arrange(arrange)
         self.named_boxes.set_current_box(box)
 
     def get_box(self, box) -> Box:
@@ -802,6 +844,8 @@ class PresentationTemplateBase(PresentationTemplateProtocol):
             return self.add_paragraph(text=paragraph, **f_kwargs)
         elif node.type == "blockquote":
             return self.compute_inline_command(node, **f_kwargs)
+        elif node.type == "bullet_list":
+            return self.add_list(node, **f_kwargs)
         elif node.type == "fence" and node.tag == "code":
             m = re.match(r"([a-zA-Z\s]+)(?:\s*\((.*)\))?$", node.info)
             if m is None:
