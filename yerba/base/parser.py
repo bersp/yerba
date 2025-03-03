@@ -56,7 +56,11 @@ def get_slides_md_nodes(md_filename, old_md_filename) -> list[dict]:
     with open(md_filename, "r") as f:
         text = f.read()
 
+    text = text.partition("--- end ---")[0]
     text = handle_includes(text)
+
+    old_text = old_text.partition("--- end ---")[0]
+    old_text = handle_includes(old_text)
 
     nodes = get_markdownit_nodes(text)
 
