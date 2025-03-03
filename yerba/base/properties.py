@@ -3,6 +3,7 @@ from collections.abc import Callable
 
 from manim import VMobject
 from ..managers.id_manager import IDManager
+from ..managers.color_manager import ColorManager
 
 def _hide_func(mo, val):
     if val is True:
@@ -25,6 +26,7 @@ custom_props: dict = {
 
 def funcs_from_props(props, only_custom_props=False):
 
+    # Custom props
     funcs = []
     for custom_prop in custom_props:
         if custom_prop in props:
@@ -35,6 +37,7 @@ def funcs_from_props(props, only_custom_props=False):
     if only_custom_props:
         return funcs, props
 
+    # Manim methods
     for prop in list(props.keys()):
         f = getattr(VMobject, prop, None)
         if isinstance(f, Callable):
@@ -43,7 +46,10 @@ def funcs_from_props(props, only_custom_props=False):
                 partial(lambda mo, f, val: f(mo, val), f=f, val=val)
             )
 
+    # Manim props
     if props:
+        if "color" in props:
+            props["color"] = ColorManager().get_color(props["color"])
         funcs.append(lambda mo: mo.set(**props))
 
     return funcs, props
